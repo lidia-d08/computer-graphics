@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rocket-Launch-Simulater</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
+    canvas { display: block; width: 100vw; height: 100vh; }
+    #countdown {
+      position: absolute;
+      top: 20%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-size: 25px;
+      z-index: 10;
+      pointer-events: none;
+      text-shadow: 0 0 20px rgba(0,0,0,0.5);
+    }
+  </style>
+</head>
+<body>
+
+<h1 id="countdown">CLICK TO LAUNCH</h1>
+<canvas id="canvas2d"></canvas>
+
+<script>
+const canvas = document.getElementById("canvas2d");
+const ctx = canvas.getContext("2d");
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resize);
+resize();
+
+// ===== STATE & PHYSICS =====
+let launched = false;
+let count = 3;
+let envOffset = 0;
+let spaceT = 0;
+let rocketSpeed = 0;
+let rocketAccel = 0.4; 
+let rocketExitY = 0;
+
+let particles = [];
+let smokeParticles = [];
+
+// ===== PARTICLE CLASS =====
+class Particle {
+  constructor(x, y, isSmoke = false) {
+    this.x = x;
+    this.y = y;
+    // Smoke is larger and lasts longer
+    this.size = isSmoke ? Math.random() * 35 + 20 : Math.random() * 25 + 10;
+    this.speedX = Math.random() * 6 - 3;
+    // Particles move down relative to the rocket
+    this.speedY = isSmoke ? Math.random() * 2 + 1 : Math.random() * 5 + 3;
+    this.life = isSmoke ? 80 : 35;
+    this.isSmoke = isSmoke;
+    this.alpha = 1;
+  }
+
+  update() {
+    this.x += this.speedX;
+    this.y += this.speedY + (rocketSpeed * 0.4);
+    this.life--;
+    this.alpha = this.life / (this.isSmoke ? 80 : 35);
+  }
+
+  draw() {
+    ctx.save();
+    ctx.globalAlpha = this.alpha;
+    if (this.isSmoke) {
+      ctx.fillStyle = `rgba(220, 220, 220, ${this.alpha})`;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      const colors = ['#ffff00', '#ffaa00', '#ff5500', '#ff0000'];
+      ctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
+      ctx.fillRect(this.x - this.size/2, this.y, this.size, this.size * 1.8);
+    }
+    ctx.restore();
+  }
+}
+
+// ===== ENVIRONMENT ASSETS =====
+let stars = [];
+for (let i = 0; i < 100; i++) {
+  stars.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, size: Math.random() * 2 + 1 });
+}
+
+let baseSize = Math.min(canvas.width, canvas.height) / 15;
+let clouds = [
+    { x: 0.2, y: 0.2, s: baseSize * 0.8 },
+    { x: 0.7, y: 0.15, s: baseSize * 0.6 },
+    { x: 0.4, y: -0.1, s: baseSize * 1.0 },
+    { x: 0.8, y: 0.5, s: baseSize * 0.7 }
+];
+
+// ===== CLICK INTERACTION =====
+canvas.addEventListener("click", () => {
+  if (launched) return;
+  document.getElementById("countdown").innerText = count;
+
+  let interval = setInterval(() => {
+    count--;
+    document.getElementById("countdown").innerText = count > 0 ? count : "";
+    if (count <= 0) {
+      launched = true;
+      clearInterval(interval);
+    }
+  }, 1000);
+});
+
+// ===== ROCKET DESIGN =====
+function drawRocket(shakeX, shakeY) {
+  const cx = canvas.width / 2 + shakeX;
+  const cy = canvas.height * 0.78 - rocketExitY + shakeY;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  let scale = Math.min(canvas.width, canvas.height) / 850;
+  ctx.scale(scale, scale);
+
+  // Main external tank 
+  ctx.fillStyle = '#c44';
+  ctx.fillRect(-22, -100, 44, 170);
+
+  // Nose cone
+  ctx.fillStyle = '#a33';
+  ctx.beginPath();
+  ctx.moveTo(-22, -100);
+  ctx.lineTo(0, -160);
+  ctx.lineTo(22, -100);
+  ctx.fill();
+
+  // Shuttle body (white)
+  ctx.fillStyle = '#ddd';
+  ctx.fillRect(-18, -60, 36, 110);
+
+  // Wings
+  ctx.fillStyle = '#999';
+  ctx.beginPath();
+  ctx.moveTo(-18, 20); ctx.lineTo(-55, 50); ctx.lineTo(-18, 50); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(18, 20); ctx.lineTo(55, 50); ctx.lineTo(18, 50); ctx.fill();
+
+  // Boosters (white/gray)
+  ctx.fillStyle = '#bbb';
+  ctx.fillRect(-48, -40, 18, 120);
+  ctx.fillRect(30, -40, 18, 120);
+
+  ctx.restore();
+
+  // Generate Exhaust Particles
+  if (launched && rocketExitY < canvas.height + 200) {
+    for(let i=0; i<3; i++) {
+        // Particles under the main engines and boosters
+        particles.push(new Particle(cx - 35, cy + 60));
+        particles.push(new Particle(cx + 35, cy + 60));
+        particles.push(new Particle(cx, cy + 70));
+        // Frequent smoke
+        if(Math.random() > 0.3) smokeParticles.push(new Particle(cx, cy + 80, true));
+    }
+  }
+}
+
+// ===== MAIN ANIMATION LOOP =====
+function draw() {
+  // 1. SKY GRADIENT (Space Transition)
+  let r = 135 * (1 - spaceT);
+  let g = 206 * (1 - spaceT);
+  let b = 250 * (1 - spaceT);
+
+  let gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  gradient.addColorStop(0, `rgb(${r},${g},${b})`);
+  gradient.addColorStop(1, `rgb(${r*0.4},${g*0.4},${b*0.6})`);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 2. STARS
+  if (spaceT > 0.3) {
+    ctx.fillStyle = `rgba(255,255,255,${spaceT})`;
+    stars.forEach(s => {
+      ctx.beginPath();
+      ctx.arc(s.x, (s.y + envOffset*0.2) % canvas.height, s.size, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  // 3. CLOUDS (Parallax)
+  if (spaceT < 0.9) {
+    ctx.fillStyle = `rgba(255,255,255,${1 - spaceT})`;
+    clouds.forEach(c => {
+      let cx = c.x * canvas.width;
+      let cy = c.y * canvas.height + envOffset * (0.5 + c.s / 100);
+      ctx.beginPath();
+      ctx.arc(cx, cy, c.s, 0, Math.PI * 2);
+      ctx.arc(cx + c.s, cy, c.s * 0.7, 0, Math.PI * 2);
+      ctx.arc(cx - c.s, cy, c.s * 0.7, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  // 4. CURVED EARTH
+  if (spaceT < 0.95) {
+    ctx.fillStyle = "#228B22";
+    let baseY = canvas.height * 0.9 + envOffset;
+    ctx.beginPath();
+    ctx.moveTo(0, canvas.height);
+    ctx.lineTo(0, baseY);
+    ctx.quadraticCurveTo(canvas.width / 2, baseY - 200, canvas.width, baseY);
+    ctx.lineTo(canvas.width, canvas.height);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // 5. PHYSICS UPDATE
+  if (launched) {
+    rocketSpeed += rocketAccel;
+    rocketExitY += rocketSpeed*0.08;
+    envOffset += rocketSpeed * 0.5;
+    rocketSpeed*0.99;
+    spaceT = Math.min(1, spaceT + 0.003);
+   
+      
+    // --- RESET LOGIC START ---
+    // If the rocket has flown completely off the top of the screen
+    if (rocketExitY > canvas.height + 1200) {
+      launched = false;
+      rocketExitY = 0;
+      rocketSpeed = 0;
+      envOffset = 0;
+      spaceT = 0;
+      count = 3; // Reset countdown for next click
+      document.getElementById("countdown").innerText = "CLICK TO LAUNCH";
+      particles = []; // Clear old fire
+      smokeParticles = []; // Clear old smoke
+    }
+    
+  
+
+  }
+
+  // 6. UPDATE & DRAW PARTICLES (Fire and Smoke)
+  for (let i = particles.length - 1; i >= 0; i--) {
+    particles[i].update();
+    particles[i].draw();
+    if (particles[i].life <= 0) particles.splice(i, 1);
+  }
+  for (let i = smokeParticles.length - 1; i >= 0; i--) {
+    smokeParticles[i].update();
+    smokeParticles[i].draw();
+    if (smokeParticles[i].life <= 0) smokeParticles.splice(i, 1);
+  }
+
+  // 7. DRAW ROCKET
+  let shake = launched ? (Math.random() - 0.5) * 4 : 0;
+  if (rocketExitY < canvas.height + 500) {
+    drawRocket(shake, shake);
+  }
+
+  requestAnimationFrame(draw);
+}
+
+draw();
+</script>
+</body>
+</html>
+
