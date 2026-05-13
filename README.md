@@ -26,16 +26,24 @@ It explore 2D graphics rendering,bezier curves,shape drawing and pattern repetit
 • bezierCurveTo()
 • fill()
 • stroke()
+
 Design highlights
+
 • Ethiopian Tibeb embroidery patterns
+
 • Decorative neckline styling
+
 • Customizable pattern colors and dress colors
 
 Preview:
 
 <img width="200" height="300" alt="photo_2026-04-19_16-31-45" src="https://github.com/user-attachments/assets/da39fe61-b356-469b-9993-0122c96a74b8" />
+
 ## Technologies Used
+
 -HTML
+
 -CSS
+
 -JavaScript canvas
 
