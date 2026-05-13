@@ -5,26 +5,45 @@ This repository contains my computer graphic course project.
 This project is a browser-based graphical simulation of a rocket launch.
 The system visually represents a rocket placed on the ground with a sky background. When the user clicks its countdown
 and the rocket is launche with animated fire effects. The background includes elements such as sky gradient, clouds, and try to make real enviroment.
+
 Key Features and Functionalities
+
 • Interactive rocket launch using mouse click
+
 • Countdown before launch like 3, 2, 1.
+
 • Smooth upward motion of the rocket
+
 • Animated fire effect during launch
+
 • Background environment including sky, clouds, and ground
+
 • Real-time rendering using WebGL
+
 Computer Graphics Concepts i use Used
+
 • Translation: Used to move the rocket upward during launch
+
 • Animation: Continuous rendering loop for smooth motion
+
 • Rendering: Drawing shapes using WebGL (triangles and buffers)
+
 • Color Interpolation: Creating gradient sky background
+
 • 2D Transformations: Position updates using coordinate system.
+
 ### 2.Ethiopian Traditional Dress Graphics
 A computer graphics project inspired by ethiopia traditional cultural clothing and design patterns.
 It explore 2D graphics rendering,bezier curves,shape drawing and pattern repetition.the dress design is fully drawn using javascript canvas commands such as:
+
 • moveTo()
+
 • lineTO()
+
 • bezierCurveTo()
+
 • fill()
+
 • stroke()
 
 Design highlights
